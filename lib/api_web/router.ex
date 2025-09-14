@@ -8,6 +8,7 @@ defmodule ApiWeb.Router do
   scope "/api", ApiWeb do
     pipe_through :api
 
+    get "/sessions/exists/:key", ApiSessionsController, :exists?
     post "/sessions", ApiSessionsController, :create
   end
 

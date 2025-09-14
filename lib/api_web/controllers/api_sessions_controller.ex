@@ -10,4 +10,11 @@ defmodule ApiWeb.ApiSessionsController do
     |> put_status(201)
     |> json(%{key: key})
   end
+
+  def exists?(conn, %{"key" => key}) do
+    case Sessions.exists?(key) do
+      true -> conn |> put_status(200) |> text("Session exists")
+      false -> conn |> put_status(404) |> text("Session does not exist")
+    end
+  end
 end
