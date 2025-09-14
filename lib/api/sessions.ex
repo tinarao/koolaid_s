@@ -1,5 +1,10 @@
 defmodule Api.Sessions do
+  require Logger
   use GenServer
+
+  # 3 часа
+  @key_ttl 60_000 * 60 * 3
+  @cleanup_interval 60_000 * 10
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, [], name: __MODULE__)
@@ -9,45 +14,50 @@ defmodule Api.Sessions do
     uuid = UUID.uuid4()
 
     case exists?(uuid) do
-      true -> generate_key()
-      false -> uuid
+      true ->
+        generate_key()
+
+      false ->
+        put(uuid)
+        uuid
     end
   end
 
   def exists?(key) do
-    GenServer.call(__MODULE__, {:get, key})
+    case :ets.lookup(__MODULE__, key) do
+      [] ->
+        false
+
+      [{^key, exp_time}] ->
+        System.monotonic_time(:millisecond) < exp_time
+    end
   end
 
-  def put(key) do
-    GenServer.cast(__MODULE__, {:put, key})
+  def put(key, ttl \\ @key_ttl) do
+    exp_time = System.monotonic_time(:millisecond) + ttl
+    :ets.insert(__MODULE__, {key, exp_time})
   end
 
   def remove(key) do
-    GenServer.cast(__MODULE__, {:remove, key})
+    :ets.delete(__MODULE__, key)
   end
 
   @impl true
   def init(_) do
-    {:ok, []}
+    :ets.new(__MODULE__, [:set, :named_table, :public, read_concurrency: true])
+
+    Process.send_after(self(), :cleanup, @cleanup_interval)
+
+    {:ok, %{}}
   end
 
   @impl true
-  def handle_call({:get, key}, _from, state) do
-    case Enum.member?(state, key) do
-      true -> {:reply, true, state}
-      false -> {:reply, false, state}
-    end
-  end
+  def handle_info(:cleanup, state) do
+    Logger.info("Cleanup")
+    now = System.monotonic_time(:millisecond)
+    :ets.select_delete(__MODULE__, [{{:"$1", :"$2"}, [{:<, :"$2", now}], [true]}])
 
-  @impl true
-  def handle_cast({:put, key}, state) do
-    {:noreply, state ++ [key]}
-  end
-
-  @impl true
-  def handle_cast({:remove, key}, state) do
-    new_state = Enum.filter(state, fn x -> x != key end)
-
-    {:noreply, new_state}
+    Process.send_after(self(), :cleanup, @cleanup_interval)
+    {:noreply, state}
   end
 end
