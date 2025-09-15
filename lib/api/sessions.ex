@@ -14,12 +14,8 @@ defmodule Api.Sessions do
     uuid = UUID.uuid4()
 
     case exists?(uuid) do
-      true ->
-        generate_key()
-
-      false ->
-        put(uuid)
-        uuid
+      true -> generate_key()
+      false -> uuid
     end
   end
 
@@ -28,18 +24,32 @@ defmodule Api.Sessions do
       [] ->
         false
 
-      [{^key, exp_time}] ->
+      [{^key, {exp_time, _creator_device_id}}] ->
         System.monotonic_time(:millisecond) < exp_time
     end
   end
 
-  def put(key, ttl \\ @key_ttl) do
+  def put(key, creator_device_id, ttl \\ @key_ttl) do
     exp_time = System.monotonic_time(:millisecond) + ttl
-    :ets.insert(__MODULE__, {key, exp_time})
+    :ets.insert(__MODULE__, {key, {exp_time, creator_device_id}})
   end
 
-  def remove(key) do
-    :ets.delete(__MODULE__, key)
+  def remove(key, device_id) do
+    case :ets.lookup(__MODULE__, key) do
+      [] ->
+        {:error, :not_found}
+
+      [{^key, {_exp_time, creator_device_id}}] ->
+        IO.inspect(creator_device_id, label: "Creator Device ID")
+        IO.inspect(device_id, label: "Device ID")
+
+        if creator_device_id == device_id do
+          :ets.delete(__MODULE__, key)
+          {:ok, :deleted}
+        else
+          {:error, :forbidden}
+        end
+    end
   end
 
   @impl true

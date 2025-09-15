@@ -3,13 +3,18 @@ defmodule ApiWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug CORSPlug, origin: ["http://localhost:3000"]
+    plug ApiWeb.DeviceId
   end
 
   scope "/api", ApiWeb do
     pipe_through :api
 
+    options "/*path", ApiOptionsController, :options
+
     get "/sessions/exists/:key", ApiSessionsController, :exists?
     post "/sessions", ApiSessionsController, :create
+    delete "/sessions/:key", ApiSessionsController, :delete
   end
 
   # Enable LiveDashboard in development
