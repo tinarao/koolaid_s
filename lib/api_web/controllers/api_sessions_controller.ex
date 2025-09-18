@@ -34,10 +34,6 @@ defmodule ApiWeb.ApiSessionsController do
 
       {:error, :forbidden} ->
         conn |> put_status(403) |> text("Forbidden")
-
-      any ->
-        IO.inspect(any)
-        conn |> put_status(500) |> text("Internal server error")
     end
   end
 end

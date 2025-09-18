@@ -10,6 +10,7 @@ defmodule ApiWeb.Router do
   scope "/api", ApiWeb do
     pipe_through :api
 
+    get "/hc", ApiHealthcheckController, :healthcheck
     options "/*path", ApiOptionsController, :options
 
     get "/sessions/exists/:key", ApiSessionsController, :exists?
